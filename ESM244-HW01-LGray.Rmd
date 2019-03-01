@@ -1,0 +1,180 @@
+---
+title: "ESM 244 HW 01"
+author: "Laura Gray"
+date: "January 27, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##0. Load Packages and Data
+
+```{r load, include = FALSE}
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(factoextra)
+
+agencies <- read_csv("agencies.csv")
+View(agencies)
+
+launches <- read_csv("launches.csv")
+View(launches)
+
+usda <- read_csv("usda_nutrients.csv")
+View(usda)
+
+```
+
+Launches:
+
+- JD: Julian  Date of launch
+- type: type of launch vehicle
+- category: success (O) or failure (F)
+- state_code: this will probably be useful in linking to "agencies" df
+
+Abbreviated List of State Codes:
+- US = United States
+- SU = Soviet Union
+- RU = Russia
+- J = Japan
+- F = France
+- CN = China
+- IN = India
+
+##1. Explore "launches" through Inital Graphs
+
+```{r}
+
+ggplot(launches, aes(x=launch_year, y=state_code)) +
+  geom_point(aes(fill=category)) +
+  geom_jitter() +
+  theme_classic()
+# Conclusions: wow, the jitterplot reveals in a very overwhelming way that "US", "SU", "RU", "F", "CN" all have many launches per year. There are interesting things I could do with that information, now... It also looks like the Soviet Union just turned into Russia as far as state codes are concerned, so I may want to merge those designations.  I should also bind data from the agencies df to the launches df so that actual names of programs appear instead of just their state codes. 
+# Questions: why is color fill not working for F/O distinction?
+
+ggplot(launches, aes(x = state_code)) +
+  geom_histogram(aes(fill = category), stat = "count") +
+  theme_classic()
+#facet_wrap(~launch_year)
+# Conclusion: Now I can start to see something about successess/failures! Nice to know that failures is a small-looking proportion. Can also see those top few programs represented here, again, in terms of gross numbers of launches.
+# Questions: still haven't seen anything of the temporal aspect. Would be interesting to see how launches changed over time, in total numbers but also in terms of successes/failures. Did the success of launches improve over time?
+```
+
+##2. Explore "agencies" through Inital Graphs
+
+```{r}
+
+
+ggplot(agencies, aes(x=state_code)) +
+  geom_histogram(aes(fill=agency_type), stat="count")
+# Conclusion: not a super interesting graph; can also get this information from the launches df
+
+
+```
+
+##3. Wrangle this to be better.
+
+```{r}
+
+#exploratory graph copied from above
+ggplot(top5states, aes(x=launch_year, y=state_code)) +
+  geom_point() +
+  geom_jitter() +
+  theme_classic()
+
+top6states <- filter(launches, state_code == "US"| state_code == "F"| state_code == "RU"| state_code == "SU"| state_code == "CN"| state_code == "IN")
+
+#change state code names, and merge SU and RU
+top5states <- top6states %>%  
+  mutate(state_code = ifelse(state_code == "RU", "Russia/USSR", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "CN", "China", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "SU", "Russia/USSR", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "US", "United States", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "IN", "India", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "F", "France", as.character(state_code)))
+
+ggplot(top5states, aes(x = state_code)) +
+  geom_histogram(aes(fill = agency_type), stat = "count") +
+  theme_classic()
+
+#more wrangling... i want summed launches for each year to graph anything interesting
+tally01 <- top5states %>% 
+  group_by(launch_year, state_code, category) %>% 
+  tally() 
+View(tally01)
+
+tally02success <- tally01 %>% 
+  filter(category == "O")
+View(tally02success)
+
+ggplot(tally02success, aes(x = launch_year, y = n, color = state_code)) + 
+  #geom_point() +
+  scale_color_manual(values = c("red","skyblue", "orange","black","blue")) + 
+  geom_line(alpha=0.7, size=1) +
+  theme_classic()
+
+
+####### FINISHED IN NEW MARKDOWN DOCUMENT = HW02b #######
+
+```
+
+##4. PCA for raw fruit and vegetable nutrients 
+
+A. Wrangle the data to only include food groups 'Vegetables and Vegetable Products' and 'Fruits and Fruit Juices'
+
+B. Only retain observations for which the short description (ShortDescrip) contains the string 'RAW'. Hint: see function str_detect() in the stringr package (it's in the tidyverse) 
+
+C.  Perform principle components analysis based on variables from 'Protein_g' through 'Zinc_mg'. If you haven't added or removed columns from the original data frame, those are columns 9:30.  
+
+D. Create a nice biplot showing both individual points (unlabeled), variables (labeled, repelled), with the two food groups (Fruits, Vegetables) differentiated by color. You'll probably want to use factoextra::fviz_pca_biplot
+ with customization. You do not need to include a figure caption. For more examples, HERE is a good starting point. 
+
+E. In text below your graph, describe several general trends that you notice from the biplot re: relationships between variables (just pick 2 - 3 pairs, and describe what the bipot tells you about the correlation) and between the food groups. 
+
+```{r}
+
+# filter data for vegetables and fruits (food group), incl. 'raw' (short description), select rows 9:30
+fruitveg01 <- usda %>% 
+  filter(FoodGroup == "Vegetables and Vegetable Products" | FoodGroup == "Fruits and Fruit Juices") %>% 
+  filter(str_detect(ShortDescrip, "RAW")) 
+  #select(2,9:30)
+View(fruitveg01)
+
+# perform pca
+fruitveg01_pca <- prcomp(fruitveg01[9:30], scale = TRUE)
+summary(fruitveg01_pca)
+
+# create a biplot
+fviz_pca_biplot(fruitveg01_pca, label = c("var"), repel = TRUE)
+
+#couldn't solve this one: habillage = 2
+
+#if(nrow(ind)!=length(habillage)) 
+#stop("The number of active individuals is different ",
+#             "from the length of the factor habillage. Please, remove the supplementary ",
+#             "individuals in the variable habillage.")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

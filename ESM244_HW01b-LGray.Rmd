@@ -1,0 +1,90 @@
+---
+title: "ESM 244 HW01b"
+author: "Laura Gray"
+date: "January 28, 2019"
+output: html_document
+---
+
+```{r load, include = FALSE}
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(factoextra)
+
+agencies <- read_csv("agencies.csv")
+View(agencies)
+
+launches <- read_csv("launches.csv")
+View(launches)
+
+usda <- read_csv("usda_nutrients.csv")
+View(usda)
+
+```
+
+##1. Visualizing Launches 
+
+```{r launches}
+
+#pull out the countries with the most launches
+top6states <- filter(launches, state_code == "US"| state_code == "F"| state_code == "RU"| state_code == "SU"| state_code == "CN"| state_code == "IN")
+
+#change state code names, and merge SU and RU
+top5states <- top6states %>%  
+  mutate(state_code = ifelse(state_code == "RU", "Russia/USSR", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "CN", "China", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "SU", "Russia/USSR", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "US", "United States", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "IN", "India", as.character(state_code))) %>% 
+  mutate(state_code = ifelse(state_code == "F", "France", as.character(state_code)))
+
+#use tally function to sum the number of launches by year, separated by success/failure
+#isolate data on successful launches
+#rename columns for better graphics
+final_launchesdf <- top5states %>% 
+  group_by(launch_year, state_code, category) %>% 
+  tally() %>% 
+  filter(category == "O") %>% 
+  rename(Year = launch_year) %>% 
+  rename(Country = state_code) %>% 
+  rename(Launches = n)
+View(final_launchesdf)
+
+#create graph
+ggplot(final_launchesdf, aes(x = Year, y = Launches, color = Country)) + 
+  #geom_point() +
+  scale_color_manual(values = c("red","skyblue", "orange","darkgrey","blue")) + 
+  geom_line(alpha=0.7, size=1) +
+  ggtitle("Number of Successful Launches per Year (1957-2018) \n") +
+  theme_classic()
+
+
+
+```
+
+## 2. Visulaizing USDA data via PCA
+
+```{r}
+# filter data for vegetables and fruits (food group), incl. 'raw' (short description), select rows 9:30
+fruitveg01 <- usda %>% 
+  filter(FoodGroup == "Vegetables and Vegetable Products" | FoodGroup == "Fruits and Fruit Juices") %>% 
+  filter(str_detect(ShortDescrip, "RAW")) 
+  #select(2,9:30)
+View(fruitveg01)
+
+# perform pca
+fruitveg01_pca <- prcomp(fruitveg01[9:30], scale = TRUE)
+summary(fruitveg01_pca)
+
+# create a biplot
+fviz_pca_biplot(fruitveg01_pca, label = c("var"), repel = TRUE)
+
+
+#couldn't solve this one: habillage = 2
+```
+
+**Trends**:
+
+There is little to no correlation between Vitmin B12 and Vitamin A, whereas Vitamins A & E are strongly, positively correlated. Sugar is has a negative correlation with most other variables, especially strong with Fat, Zinc, Thiamin, and Protein. 
+
